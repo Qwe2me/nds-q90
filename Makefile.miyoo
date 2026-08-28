@@ -1,0 +1,49 @@
+# Makefile для портирования DraStic на Miyoo CFW (SDL 1.2)
+export CC=${CROSS}gcc
+export AR=${CROSS}ar
+export AS=${CROSS}as
+export LD=${CROSS}ld
+export CXX=${CROSS}g++
+export HOST=arm-linux
+
+# Флаги для SDL 1.2 (под Miyoo CFW)
+SDL_CFLAGS = -I/opt/miyoo/arm-miyoo-linux-uclibcgnueabi/sysroot/usr/include/SDL
+SDL_LIBS = -lSDL -L/opt/miyoo/arm-miyoo-linux-uclibcgnueabi/sysroot/usr/lib
+
+CFLAGS += $(SDL_CFLAGS)
+LDFLAGS += $(SDL_LIBS)
+
+REL_VER = $(shell git rev-parse HEAD | cut -c 1-8)
+CFLAGS   += -DREL_VER=0x$(REL_VER)
+
+.PHONY: all
+all: cfg
+        make -C common MOD=$(MOD)
+        cp common/libcommon.so drastic/lib/
+
+        make -C detour MOD=$(MOD)
+        cp detour/libdtr.so drastic/lib/
+
+        # Пока отключаем звук (ALSA) и SDL2
+        # make -C alsa MOD=$(MOD)
+        # cp alsa/libasound.so.2 drastic/lib/
+        #
+        # make -C sdl2 -j4
+        # cp sdl2/build/.libs/libSDL2-2.0.so.0 drastic/lib/
+
+.PHONY: cfg
+cfg:
+        mkdir -p drastic/lib
+        cp -a assets/$(MOD)/* drastic/ || true
+
+.PHONY: rel
+rel:
+        zip -r drastic_$(MOD)_$(REL_VER).zip drastic
+
+.PHONY: clean
+clean:
+        make -C common clean
+        make -C detour clean
+        rm -rf sdl2/Makefile
+        rm -rf sdl2/configure
+        rm -rf drastic/lib
