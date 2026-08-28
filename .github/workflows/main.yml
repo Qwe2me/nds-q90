@@ -1,0 +1,59 @@
+name: Build DraStic Wrapper for Miyoo CFW (Docker)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v4
+
+    - name: Build with Docker
+      run: |
+        docker run --rm \
+          -v $(pwd):/src \
+          -w /src \
+          miyoocfw/toolchain-shared-uclibc:latest \
+          /bin/bash -c "
+            echo '========================================='
+            echo '🔨 СБОРКА COMMON (libcommon.so)'
+            echo '========================================='
+            cd common
+            make clean
+            make CROSS=arm-linux- MOD=miyoo
+            ls -la libcommon.so
+            
+            echo ''
+            echo '========================================='
+            echo '🔨 СБОРКА DETOUR (libdtr.so)'
+            echo '========================================='
+            cd ../detour
+            make clean
+            make CROSS=arm-linux- MOD=miyoo
+            ls -la libdtr.so
+            
+            echo ''
+            echo '========================================='
+            echo '📦 ПОДГОТОВКА drastic/lib'
+            echo '========================================='
+            cd ..
+            mkdir -p drastic/lib
+            cp common/libcommon.so drastic/lib/
+            cp detour/libdtr.so drastic/lib/
+            
+            echo ''
+            echo '✅ Готово! Файлы в drastic/lib/:'
+            ls -la drastic/lib/
+          "
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: drastic-wrapper-miyoo
+        path: |
+          drastic/
