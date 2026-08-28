@@ -722,6 +722,61 @@ TEST(detour, restore_prehook)
 }
 #endif
 
+// ============================================================
+//  SDL 1.2 UPDATE SCREEN (для Miyoo CFW)
+// ============================================================
+
+static int current_screen = 0;  // 0 = верхний, 1 = нижний
+
+void toggle_screen(void) {
+    current_screen = 1 - current_screen;
+}
+
+void my_update_screen(void *system)
+{
+    // 1. Получаем пиксели из DraStic
+    uint16_t *pixels = (uint16_t *)(*(uintptr_t *)myhook.var.sdl.screen[current_screen].pixels);
+    if (!pixels) {
+        return;
+    }
+
+    // 2. Получаем SDL_Surface (экран Miyoo)
+    SDL_Surface *screen = SDL_GetVideoSurface();
+    if (!screen) {
+        return;
+    }
+
+    // 3. Размеры NDS: 256x192
+    int src_w = 256;
+    int src_h = 192;
+
+    // 4. Позиция по центру экрана 320x240
+    int dst_x = (320 - src_w) / 2;  // 32
+    int dst_y = (240 - src_h) / 2;  // 24
+
+    // 5. Блокируем поверхность
+    if (SDL_MUSTLOCK(screen)) {
+        SDL_LockSurface(screen);
+    }
+
+    // 6. Копируем пиксели
+    uint16_t *dst = (uint16_t *)screen->pixels;
+    dst += dst_y * (screen->pitch / 2) + dst_x;
+
+    for (int y = 0; y < src_h; y++) {
+        memcpy(dst, pixels + y * src_w, src_w * 2);
+        dst += screen->pitch / 2;
+    }
+
+    // 7. Разблокируем поверхность
+    if (SDL_MUSTLOCK(screen)) {
+        SDL_UnlockSurface(screen);
+    }
+
+    // 8. Показываем на экране
+    SDL_Flip(screen);
+}
+
 static int init_table(void)
 {
     trace("call %s()\n", __func__);
@@ -785,7 +840,7 @@ static int init_table(void)
     myhook.fun.quit = (void *)0x0000e8d0;
     myhook.fun.savestate_pre = (void *)0;
     myhook.fun.savestate_post = (void *)0;
-    myhook.fun.update_screen = (void *)0x0008a120;
+    myhook.fun.update_screen = (void *)my_update_screen;  // <- SDL 1.2
     myhook.fun.load_state = (void *)0x000746f0;
     myhook.fun.save_state = (void *)0x00074da0;
     myhook.fun.blit_screen_menu = (void *)0x00088570;
@@ -810,7 +865,7 @@ static int init_table(void)
     myhook.fun.quit = (void *)0x08006444;
     myhook.fun.savestate_pre = (void *)0x08095a80;
     myhook.fun.savestate_post = (void *)0x08095154;
-    myhook.fun.update_screen = (void *)0x080a83c0;
+    myhook.fun.update_screen = (void *)my_update_screen;  // <- SDL 1.2
     myhook.fun.load_state = (void *)0x080951c0;
     myhook.fun.save_state = (void *)0x0809580c;
     myhook.fun.blit_screen_menu = (void *)0x080a62d8;
@@ -945,18 +1000,20 @@ int init_hook(const char *home, size_t page, const char *path)
         );
     }
 
-    add_prehook(
-        (void *)myhook.fun.audio_capture_flush,
-        (void *)prehook_audio_capture_flush,
-        NULL
-    );
+    // Звук отключён (закомментировано)
+    // add_prehook(
+    //     (void *)myhook.fun.audio_capture_flush,
+    //     (void *)prehook_audio_capture_flush,
+    //     NULL
+    // );
 
 #if !defined(NDS_ARM64)
-    add_prehook(
-        (void *)myhook.fun.render_polygon_setup_perspective_steps,
-        render_polygon_setup_perspective_steps,
-        NULL
-    );
+    // 3D отключено (закомментировано)
+    // add_prehook(
+    //     (void *)myhook.fun.render_polygon_setup_perspective_steps,
+    //     render_polygon_setup_perspective_steps,
+    //     NULL
+    // );
 
     add_prehook(
         (void *)myhook.fun.save_directory_config_file,
@@ -964,6 +1021,13 @@ int init_hook(const char *home, size_t page, const char *path)
         myhook.fun.org_save_directory_config_file
     );
 #endif
+
+    // Перехват update_screen для SDL 1.2
+    add_prehook(
+        (void *)myhook.fun.update_screen,
+        (void *)my_update_screen,
+        NULL
+    );
 
     return 0;
 }
@@ -1042,4 +1106,3 @@ TEST(detour, render_polygon_setup_perspective_steps)
     TEST_PASS();
 }
 #endif
-
