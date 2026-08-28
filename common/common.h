@@ -4,6 +4,17 @@
 #ifndef __COMMON_H__
 #define __COMMON_H__
 
+// ============================================================
+// Miyoo CFW: SDL 1.2
+// ============================================================
+#include <SDL.h>
+#include <SDL_ttf.h>
+#include <SDL_image.h>
+
+// Отключаем JSON для Miyoo CFW (пока не нужен)
+#undef CFG_USING_JSON_FORMAT
+#define CFG_USING_JSON_FORMAT 0
+
 #define NDS_W           256
 #define NDS_H           192
 #define NDS_Wx2         (NDS_W << 1)
@@ -332,4 +343,3 @@ uint32_t rgb565_to_rgb888(uint16_t);
 #endif
 
 #endif
-
